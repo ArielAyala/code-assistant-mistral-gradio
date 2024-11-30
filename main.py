@@ -3,7 +3,7 @@ import logging
 import gradio as gr
 from mistralai import Mistral
 from dotenv import load_dotenv
-from typing import Optional
+from typing import Optional, List, Dict
 
 # Load environment variables
 load_dotenv()
@@ -38,21 +38,19 @@ def create_mistral_client(api_key: str) -> Mistral:
         logging.error(f"Failed to create Mistral client: {e}")
         raise
 
-def get_chat_response(client: Mistral, user_input: str, model: Optional[str] = MODEL_NAME) -> str:
+def get_chat_response(client: Mistral, conversation_history: List[Dict[str, str]], user_input: str, model: Optional[str] = MODEL_NAME) -> str:
     """
     Gets a response from the Mistral chatbot model.
     """
     try:
+        conversation_history.append({"role": "user", "content": user_input})
         chat_response = client.chat.complete(
             model=model,
-            messages=[
-                {
-                    "role": "user",
-                    "content": user_input,
-                },
-            ]
+            messages=conversation_history
         )
-        return chat_response.choices[0].message.content
+        response_content = chat_response.choices[0].message.content
+        conversation_history.append({"role": "assistant", "content": response_content})
+        return response_content
     except KeyError as ke:
         logging.error(f"Unexpected response format: {ke}")
         return "An error occurred while processing the response, please try again later."
@@ -60,30 +58,38 @@ def get_chat_response(client: Mistral, user_input: str, model: Optional[str] = M
         logging.error(f"Error interacting with the Mistral API: {e}")
         return "An error occurred while interacting with the Mistral API. Please try again later."
 
-def chat_with_mistral(user_input: str) -> str:
+def chat_with_mistral(user_input: str, conversation_history: List[Dict[str, str]]) -> List[Dict[str, str]]:
     """
     Facilitates the interaction with Mistral using user input.
     """
     try:
         api_key = get_api_key()
         client = create_mistral_client(api_key)
-        return get_chat_response(client, user_input)
+        response = get_chat_response(client, conversation_history, user_input)
+        return conversation_history
     except ValueError as ve:
         logging.error(f"Configuration error: {ve}")
-        return "Configuration error. Please check your API key settings."
+        return [{"role": "assistant", "content": "Configuration error. Please check your API key settings."}]
     except Exception as e:
         logging.error(f"Unexpected error: {e}")
-        return "An unexpected error occurred, please try again later."
+        return [{"role": "assistant", "content": "An unexpected error occurred, please try again later."}]
 
 def create_gradio_interface() -> None:
     """
     Creates and launches the Gradio user interface.
     Allows users to interact with the Mistral chatbot through a simple GUI.
     """
+    conversation_history = gr.State([])
+
+    def chatbot_response(user_input, conversation_history):
+        updated_history = chat_with_mistral(user_input, conversation_history)
+        response_text = "\n".join([f"{msg['role'].capitalize()}: {msg['content']}" for msg in updated_history])
+        return response_text, updated_history
+
     ui = gr.Interface(
-        fn=chat_with_mistral,
-        inputs=gr.Textbox(label="Enter your message"),
-        outputs=gr.Markdown(label="Chatbot response"),
+        fn=chatbot_response,
+        inputs=[gr.Textbox(label="Enter your message"), conversation_history],
+        outputs=[gr.Markdown(label="Chatbot response"), conversation_history],
         title="Mistral Coding Assistant",
         description="A chatbot that helps with coding tasks.",
         examples=[
