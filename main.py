@@ -44,10 +44,7 @@ def get_chat_response(client: Mistral, conversation_history: List[Dict[str, str]
     """
     try:
         conversation_history.append({"role": "user", "content": user_input})
-        chat_response = client.chat.complete(
-            model=model,
-            messages=conversation_history
-        )
+        chat_response = client.chat.complete(model=model, messages=conversation_history)
         response_content = chat_response.choices[0].message.content
         conversation_history.append({"role": "assistant", "content": response_content})
         return response_content
@@ -58,15 +55,15 @@ def get_chat_response(client: Mistral, conversation_history: List[Dict[str, str]
         logging.error(f"Error interacting with the Mistral API: {e}")
         return "An error occurred while interacting with the Mistral API. Please try again later."
 
-def chat_with_mistral(user_input: str, conversation_history: List[Dict[str, str]]) -> List[Dict[str, str]]:
+def update_conversation(user_input: str, history: List[Dict[str, str]]) -> List[Dict[str, str]]:
     """
-    Facilitates the interaction with Mistral using user input.
+    Manages the conversation by updating the history and fetching the response.
     """
     try:
         api_key = get_api_key()
         client = create_mistral_client(api_key)
-        response = get_chat_response(client, conversation_history, user_input)
-        return conversation_history
+        get_chat_response(client, history, user_input)  # Updates the history in place
+        return history
     except ValueError as ve:
         logging.error(f"Configuration error: {ve}")
         return [{"role": "assistant", "content": "Configuration error. Please check your API key settings."}]
@@ -81,15 +78,15 @@ def create_gradio_interface() -> None:
     """
     conversation_history = gr.State([])
 
-    def chatbot_response(user_input, conversation_history):
-        updated_history = chat_with_mistral(user_input, conversation_history)
+    def chatbot_response(user_input: str, conversation_history: List[Dict[str, str]]) -> List[Dict[str, str]]:
+        updated_history = update_conversation(user_input, conversation_history)
         response_text = "\n".join([f"{msg['role'].capitalize()}: {msg['content']}" for msg in updated_history])
         return response_text, updated_history
 
     ui = gr.Interface(
         fn=chatbot_response,
         inputs=[gr.Textbox(label="Enter your message"), conversation_history],
-        outputs=[gr.Markdown(label="Chatbot response"), conversation_history],
+        outputs=[gr.Markdown(label="Chatbot response"), gr.State()],
         title="Mistral Coding Assistant",
         description="A chatbot that helps with coding tasks.",
         examples=[
@@ -98,6 +95,7 @@ def create_gradio_interface() -> None:
         ],
         allow_flagging="never",
     )
+
     ui.launch()
 
 if __name__ == "__main__":
