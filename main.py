@@ -93,10 +93,10 @@ def create_gradio_interface() -> None:
             ["What is the syntax for a for loop in Python?"],
             ["How do I create a new list in Python?"],
         ],
-        allow_flagging="never",
+        flagging_mode="never",
     )
 
-    ui.launch()
+    ui.launch(server_name="0.0.0.0", server_port=int(os.environ.get("PORT", 8080)))
 
 if __name__ == "__main__":
     create_gradio_interface()
