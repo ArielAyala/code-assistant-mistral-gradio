@@ -96,7 +96,12 @@ def create_gradio_interface() -> None:
         flagging_mode="never",
     )
 
-    ui.launch(server_name="0.0.0.0", server_port=int(os.environ.get("PORT", 8080)))
+    # Check the environment to decide how to launch
+    env = os.environ.get("ENV", "development")  # Default to 'development'
+    if env == "production":
+        ui.launch(server_name="0.0.0.0", server_port=int(os.environ.get("PORT", 8080)))
+    else:
+        ui.launch()  # Defaults for development
 
 if __name__ == "__main__":
     create_gradio_interface()
