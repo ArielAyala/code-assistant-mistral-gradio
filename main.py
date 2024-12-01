@@ -93,13 +93,16 @@ def create_gradio_interface() -> None:
             ["What is the syntax for a for loop in Python?"],
             ["How do I create a new list in Python?"],
         ],
-        flagging_mode="never",
+        allow_flagging="never",
     )
 
     # Check the environment to decide how to launch
     env = os.environ.get("ENV", "development")  # Default to 'development'
+
     if env == "production":
         ui.launch(server_name="0.0.0.0", server_port=int(os.environ.get("PORT", 8080)))
+    elif env == "docker":
+        ui.launch(server_name="0.0.0.0", server_port=int(os.environ.get("PORT", 7860)))  # Default Docker port
     else:
         ui.launch()  # Defaults for development
 
